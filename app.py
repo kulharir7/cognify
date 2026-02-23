@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-from src.ui import check_auth, inject_css, render_header, render_sidebar_footer, pipeline_html, parse_sources
+from src.ui import check_auth, inject_css, render_header, render_sidebar_footer, render_pipeline, parse_sources
 from src.export import export_markdown, export_single_answer
 
 if not check_auth():
@@ -77,7 +77,6 @@ with st.sidebar:
     st.markdown("### ⚙️ Display")
     show_trace = st.toggle("Agent Reasoning Trace", value=True)
     show_sources = st.toggle("Source Documents", value=True)
-    show_pipeline = st.toggle("Pipeline Visualization", value=True)
 
     st.divider()
 
@@ -169,13 +168,8 @@ if prompt := st.chat_input("Ask anything about your documents..."):
             for m in st.session_state.messages[:-1]
         ]
 
-        if show_pipeline:
-            pipeline_placeholder = st.empty()
-            pipeline_placeholder.markdown(pipeline_html("context_rewriter"), unsafe_allow_html=True)
-
-        status_text = st.empty()
-        status_text.markdown("🔄 **Context Rewriter** analyzing conversation...")
         answer_placeholder = st.empty()
+        status_container = st.status("🧠 **Agent Pipeline Running...**", expanded=True)
 
         try:
             final_state = None
@@ -197,38 +191,33 @@ if prompt := st.chat_input("Ask anything about your documents..."):
                     continue
 
                 if step_name == "fact_checker_start":
-                    status_text.markdown("✅ **Fact-Checker** streaming verified answer...")
-                    if show_pipeline:
-                        timings = data.get("timings", {})
-                        pipeline_placeholder.markdown(pipeline_html("fact_checker", {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
+                    status_container.write("✅ **Fact-Checker** — streaming verified answer...")
                     continue
 
                 state = data
                 final_state = state
                 timings = state.get("timings", {})
 
-                if show_pipeline:
-                    pipeline_placeholder.markdown(pipeline_html(step_name, {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
-
                 if step_name == "context_rewriter":
-                    status_text.markdown("🔍 **Researcher** searching knowledge base...")
-                    if show_pipeline:
-                        pipeline_placeholder.markdown(pipeline_html("researcher", {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
+                    t = timings.get("context_rewriter", 0)
+                    status_container.write(f"🔄 **Context Rewriter** — done ({t:.1f}s)")
+                    status_container.write("🔍 **Researcher** — searching knowledge base...")
                 elif step_name == "researcher":
-                    status_text.markdown(f"📝 **Synthesizer** creating cited answer... (Researcher: {timings.get('researcher', 0):.1f}s)")
-                    if show_pipeline:
-                        pipeline_placeholder.markdown(pipeline_html("synthesizer", {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
+                    t = timings.get("researcher", 0)
+                    status_container.write(f"🔍 **Researcher** — done ({t:.1f}s)")
+                    status_container.write("📝 **Synthesizer** — creating cited answer...")
                 elif step_name == "synthesizer":
-                    status_text.markdown(f"✅ **Fact-Checker** verifying claims... (Synthesizer: {timings.get('synthesizer', 0):.1f}s)")
-                    if show_pipeline:
-                        pipeline_placeholder.markdown(pipeline_html("fact_checker", {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
+                    t = timings.get("synthesizer", 0)
+                    status_container.write(f"📝 **Synthesizer** — done ({t:.1f}s)")
+                    status_container.write("✅ **Fact-Checker** — verifying claims...")
 
             total_elapsed = time.time() - start_total
-            status_text.empty()
             
-            if show_pipeline and final_state:
-                final_timings = {k: f"{v:.1f}s" for k, v in final_state.get("timings", {}).items()}
-                pipeline_placeholder.markdown(pipeline_html("done", final_timings), unsafe_allow_html=True)
+            # Finalize status
+            if final_state:
+                t = final_state.get("timings", {})
+                status_container.write(f"✅ **Fact-Checker** — done ({t.get('fact_checker', 0):.1f}s)")
+            status_container.update(label=f"✅ **Complete** — {total_elapsed:.1f}s total", state="complete", expanded=False)
 
             answer = final_state["final_answer"]
             trace = final_state["agent_trace"]
@@ -278,9 +267,7 @@ if prompt := st.chat_input("Ask anything about your documents..."):
             })
 
         except Exception as e:
-            status_text.empty()
-            if show_pipeline:
-                pipeline_placeholder.empty()
+            status_container.update(label="❌ Error", state="error", expanded=True)
             error_msg = f"❌ Error: {str(e)}"
             st.error(error_msg)
             st.session_state.messages.append({"role": "assistant", "content": error_msg})

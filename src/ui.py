@@ -309,8 +309,8 @@ def render_sidebar_footer():
         st.rerun()
 
 
-def pipeline_html(step="none", timings=None):
-    """Generate pipeline visualization HTML."""
+def render_pipeline(step="none", timings=None):
+    """Render pipeline visualization using native Streamlit columns."""
     timings = timings or {}
     steps = [
         ("🔄", "Context", "context_rewriter"),
@@ -321,28 +321,41 @@ def pipeline_html(step="none", timings=None):
     order = ["context_rewriter", "researcher", "synthesizer", "fact_checker"]
     current_idx = order.index(step) if step in order else -1
 
-    html = '<div class="pipeline-container">'
+    # Build columns: agent → arrow → agent → arrow → ...
+    cols = st.columns([3, 1, 3, 1, 3, 1, 3])
+    
+    col_idx = 0
     for i, (emoji, label, key) in enumerate(steps):
         if i > 0:
-            arrow_cls = "done" if i <= current_idx else ""
-            html += f'<div class="pipeline-arrow {arrow_cls}">→</div>'
-
-        if key == step:
-            cls = "active"
-        elif order.index(key) < current_idx:
-            cls = "done"
-        else:
-            cls = "waiting"
-
-        t = timings.get(key, "")
-        time_html = f'<div class="pipeline-time">{t}</div>' if t else ""
-        html += f'''<div class="pipeline-node {cls}">
-            <div class="pipeline-emoji">{emoji}</div>
-            <div class="pipeline-label">{label}</div>
-            {time_html}
-        </div>'''
-    html += '</div>'
-    return html
+            # Arrow column
+            with cols[col_idx]:
+                arrow = "✅→" if order.index(key) <= current_idx else "→"
+                st.markdown(f"<div style='text-align:center; padding-top:18px; color:#30363d; font-size:1.3em;'>{arrow}</div>", unsafe_allow_html=True)
+            col_idx += 1
+        
+        with cols[col_idx]:
+            if key == step:
+                color = "#667eea"
+                bg = "rgba(102,126,234,0.12)"
+                border = "1px solid rgba(102,126,234,0.4)"
+            elif order.index(key) < current_idx:
+                color = "#3fb950"
+                bg = "rgba(35,134,54,0.1)"
+                border = "1px solid rgba(35,134,54,0.3)"
+            else:
+                color = "#6e7681"
+                bg = "rgba(22,27,34,0.4)"
+                border = "1px solid rgba(48,54,61,0.3)"
+            
+            t = timings.get(key, "")
+            time_str = f"<div style='font-size:0.7em; color:#58a6ff;'>{t}</div>" if t else ""
+            
+            st.markdown(f"""<div style="text-align:center; padding:12px 8px; background:{bg}; border:{border}; border-radius:12px;">
+<div style="font-size:1.5em;">{emoji}</div>
+<div style="font-size:0.8em; color:{color}; font-weight:600;">{label}</div>
+{time_str}
+</div>""", unsafe_allow_html=True)
+        col_idx += 1
 
 
 def parse_sources(retrieved_docs):
