@@ -8,7 +8,7 @@ import time
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, SystemMessage
-from src.llm import get_llm
+from src.llm import get_llm, get_streaming_llm
 from src.ingest import get_vectorstore
 from src.config import Config
 
@@ -261,6 +261,55 @@ Keep the [Source N] citations. Use markdown formatting."""
     return state
 
 
+def fact_checker_streaming(state: AgentState):
+    """Streaming version of fact-checker — yields tokens one by one.
+    
+    Returns: generator of (token_str, final_state_or_None)
+    Last yield has the final state.
+    """
+    start = time.time()
+    llm = get_streaming_llm()
+    prompt = f"""You are a Fact-Check Agent. Verify the synthesized answer against the original sources.
+
+Synthesized Answer:
+{state['synthesis']}
+
+Original Sources:
+{"---".join(state['retrieved_docs'])}
+
+For each major claim:
+- ✅ VERIFIED — directly supported by sources
+- ⚠️ PARTIALLY SUPPORTED — partially supported
+- ❌ NOT FOUND — no source supports it
+
+Then provide the FINAL VERIFIED ANSWER — clean, professional, with only well-supported claims. 
+Keep the [Source N] citations. Use markdown formatting."""
+
+    messages = [
+        SystemMessage(content="You are a rigorous fact-checker. Output a clean, verified final answer."),
+        HumanMessage(content=prompt)
+    ]
+    
+    full_response = ""
+    for chunk in llm.stream(messages):
+        token = chunk.content
+        if token:
+            full_response += token
+            yield token, None
+    
+    elapsed = time.time() - start
+    state["fact_check"] = full_response
+    state["final_answer"] = full_response
+    state["agent_trace"].append({
+        "agent": "✅ Fact-Checker",
+        "action": "Verified all claims against sources",
+        "output_preview": full_response[:300] + "..." if len(full_response) > 300 else full_response,
+        "time": f"{elapsed:.1f}s",
+    })
+    state["timings"]["fact_checker"] = elapsed
+    yield "", state  # Final yield with complete state
+
+
 # --- Build Graph ---
 
 def build_graph():
@@ -283,12 +332,17 @@ def build_graph():
 
 # --- Run step by step (for UI progress) ---
 
-def run_query_steps(query: str, chat_history: list[dict] = None):
+def run_query_steps(query: str, chat_history: list[dict] = None, streaming: bool = False):
     """Generator that yields after each agent step for real-time UI updates.
     
     Args:
         query: Current user question
-        chat_history: List of previous messages [{"role": "user"/"assistant", "content": "..."}]
+        chat_history: List of previous messages
+        streaming: If True, fact-checker streams tokens via ("stream_token", token, None) yields
+    
+    Yields:
+        Non-streaming: (step_name, state)
+        Streaming: (step_name, state) for first 3 agents, then ("stream_token", token_str, state_or_None)
     """
     state: AgentState = {
         "query": query,
@@ -303,7 +357,7 @@ def run_query_steps(query: str, chat_history: list[dict] = None):
         "timings": {},
     }
 
-    # Step 1: Context Rewriter (rewrites query with conversation context)
+    # Step 1: Context Rewriter
     state = context_rewriter(state)
     yield "context_rewriter", state
 
@@ -315,9 +369,17 @@ def run_query_steps(query: str, chat_history: list[dict] = None):
     state = synthesizer(state)
     yield "synthesizer", state
 
-    # Step 4: Fact-Checker
-    state = fact_checker(state)
-    yield "fact_checker", state
+    # Step 4: Fact-Checker (streaming or non-streaming)
+    if streaming:
+        yield "fact_checker_start", state  # Signal: streaming about to begin
+        for token, final_state in fact_checker_streaming(state):
+            if final_state is not None:
+                yield "fact_checker_done", final_state
+            else:
+                yield "stream_token", token
+    else:
+        state = fact_checker(state)
+        yield "fact_checker", state
 
 
 def run_query(query: str, chat_history: list[dict] = None) -> AgentState:

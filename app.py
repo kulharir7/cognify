@@ -632,9 +632,41 @@ if prompt := st.chat_input("Ask anything about your documents..."):
         status_text = st.empty()
         status_text.markdown("🔄 **Context Rewriter** analyzing conversation...")
 
+        # Streaming answer placeholder
+        answer_placeholder = st.empty()
+
         try:
             final_state = None
-            for step_name, state in run_query_steps(prompt, chat_history=chat_history):
+            streamed_answer = ""
+            
+            for result in run_query_steps(prompt, chat_history=chat_history, streaming=True):
+                # Handle different yield formats
+                if len(result) == 2:
+                    step_name, data = result
+                else:
+                    continue
+                
+                # Stream tokens
+                if step_name == "stream_token":
+                    streamed_answer += data
+                    answer_placeholder.markdown(streamed_answer + "▌")
+                    continue
+                
+                if step_name == "fact_checker_done":
+                    final_state = data
+                    # Remove cursor
+                    answer_placeholder.markdown(final_state["final_answer"])
+                    continue
+                
+                if step_name == "fact_checker_start":
+                    status_text.markdown("✅ **Fact-Checker** streaming verified answer...")
+                    if show_pipeline:
+                        timings = data.get("timings", {})
+                        pipeline_placeholder.markdown(pipeline_html("fact_checker", {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
+                    continue
+                
+                # Regular agent steps
+                state = data
                 final_state = state
                 timings = state.get("timings", {})
 
@@ -662,12 +694,10 @@ if prompt := st.chat_input("Ask anything about your documents..."):
                 final_timings = {k: f"{v:.1f}s" for k, v in final_state.get("timings", {}).items()}
                 pipeline_placeholder.markdown(pipeline_html("done", final_timings), unsafe_allow_html=True)
 
-            # Answer
+            # Answer already streamed above via answer_placeholder
             answer = final_state["final_answer"]
             trace = final_state["agent_trace"]
             sources = parse_sources(final_state.get("retrieved_docs", []))
-
-            st.markdown(answer)
 
             # Time badge
             total_time_str = f"{total_elapsed:.1f}s"
