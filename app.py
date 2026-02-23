@@ -112,35 +112,16 @@ if not os.getenv("LLM_API_KEY"):
 
 # --- Empty State ---
 if chunk_count == 0 and not st.session_state.get("messages"):
-    st.markdown("""
-    <div style="text-align:center; padding: 80px 20px;">
-        <div style="font-size: 4em; margin-bottom: 12px;">🔍</div>
-        <div style="color: #c9d1d9; font-size: 1.3em; font-weight: 600;">Upload documents to start researching</div>
-        <div style="color: #6e7681; font-size: 0.95em; margin-top: 6px;">PDF, TXT, Markdown — drag & drop in the sidebar</div>
-        <div style="display:flex; justify-content:center; gap:48px; margin-top:40px;">
-            <div style="text-align:center;">
-                <div style="font-size:2em;">🔄</div>
-                <div style="color:#c9d1d9; font-size:0.88em; font-weight:500;">Context</div>
-                <div style="color:#58a6ff; font-size:0.75em;">Follow-up aware</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:2em;">🔍</div>
-                <div style="color:#c9d1d9; font-size:0.88em; font-weight:500;">Researcher</div>
-                <div style="color:#58a6ff; font-size:0.75em;">Semantic search</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:2em;">📝</div>
-                <div style="color:#c9d1d9; font-size:0.88em; font-weight:500;">Synthesizer</div>
-                <div style="color:#58a6ff; font-size:0.75em;">Cited answers</div>
-            </div>
-            <div style="text-align:center;">
-                <div style="font-size:2em;">✅</div>
-                <div style="color:#c9d1d9; font-size:0.88em; font-weight:500;">Fact-Checker</div>
-                <div style="color:#58a6ff; font-size:0.75em;">Verification</div>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.info("📄 Upload documents in the sidebar to start researching. Then ask questions below!")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown("🔄 **Context**\n\nFollow-up aware")
+    with c2:
+        st.markdown("🔍 **Researcher**\n\nHybrid search")
+    with c3:
+        st.markdown("📝 **Synthesizer**\n\nCited answers")
+    with c4:
+        st.markdown("✅ **Fact-Checker**\n\nVerification")
 
 # --- Chat ---
 if "messages" not in st.session_state:
