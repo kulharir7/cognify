@@ -494,11 +494,12 @@ with st.sidebar:
 def pipeline_html(step="none", timings=None):
     timings = timings or {}
     steps = [
+        ("🔄", "Context", "context_rewriter"),
         ("🔍", "Researcher", "researcher"),
         ("📝", "Synthesizer", "synthesizer"),
         ("✅", "Fact-Checker", "fact_checker"),
     ]
-    order = ["researcher", "synthesizer", "fact_checker"]
+    order = ["context_rewriter", "researcher", "synthesizer", "fact_checker"]
     current_idx = order.index(step) if step in order else -1
 
     html = '<div class="pipeline-container">'
@@ -551,6 +552,11 @@ if chunk_count == 0 and not st.session_state.get("messages"):
         <div class="empty-title">Upload documents to start researching</div>
         <div class="empty-desc">PDF, TXT, Markdown — drag & drop in the sidebar</div>
         <div class="feature-grid">
+            <div class="feature-item">
+                <div class="feature-icon">🔄</div>
+                <div class="feature-name">Context Rewriter</div>
+                <div class="feature-desc">Understands follow-ups</div>
+            </div>
             <div class="feature-item">
                 <div class="feature-icon">🔍</div>
                 <div class="feature-name">Researcher</div>
@@ -611,25 +617,35 @@ if prompt := st.chat_input("Ask anything about your documents..."):
     with st.chat_message("assistant"):
         start_total = time.time()
 
+        # Build chat history for conversation memory (exclude current message)
+        chat_history = [
+            {"role": m["role"], "content": m["content"]}
+            for m in st.session_state.messages[:-1]  # exclude current user msg
+        ]
+
         # Pipeline visualization placeholder
         if show_pipeline:
             pipeline_placeholder = st.empty()
-            pipeline_placeholder.markdown(pipeline_html("researcher"), unsafe_allow_html=True)
+            pipeline_placeholder.markdown(pipeline_html("context_rewriter"), unsafe_allow_html=True)
 
         # Status area
         status_text = st.empty()
-        status_text.markdown("🔍 **Researcher** searching knowledge base...")
+        status_text.markdown("🔄 **Context Rewriter** analyzing conversation...")
 
         try:
             final_state = None
-            for step_name, state in run_query_steps(prompt):
+            for step_name, state in run_query_steps(prompt, chat_history=chat_history):
                 final_state = state
                 timings = state.get("timings", {})
 
                 if show_pipeline:
                     pipeline_placeholder.markdown(pipeline_html(step_name, {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
 
-                if step_name == "researcher":
+                if step_name == "context_rewriter":
+                    status_text.markdown(f"🔍 **Researcher** searching knowledge base...")
+                    if show_pipeline:
+                        pipeline_placeholder.markdown(pipeline_html("researcher", {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
+                elif step_name == "researcher":
                     status_text.markdown(f"📝 **Synthesizer** creating cited answer... (Researcher: {timings.get('researcher', 0):.1f}s)")
                     if show_pipeline:
                         pipeline_placeholder.markdown(pipeline_html("synthesizer", {k: f"{v:.1f}s" for k, v in timings.items()}), unsafe_allow_html=True)
