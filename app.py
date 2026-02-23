@@ -99,6 +99,17 @@ with st.sidebar:
 
     render_sidebar_footer()
 
+# --- Check if API key is configured ---
+if not os.getenv("LLM_API_KEY"):
+    st.warning("⚠️ **No API key configured!** Go to ⚙️ Settings page and add your LLM API key to start using Cognify.")
+    st.markdown("""
+    **Supported providers:**
+    - 🟢 **Ollama Cloud** — [Get free key](https://ollama.com) (Free/Pro/Max plans)
+    - 🟢 **OpenAI** — [Get key](https://platform.openai.com/api-keys)
+    - 🟢 **Anthropic** — [Get key](https://console.anthropic.com/)
+    - 🟢 **Any OpenAI-compatible API**
+    """)
+
 # --- Empty State ---
 if chunk_count == 0 and not st.session_state.get("messages"):
     st.markdown("""
