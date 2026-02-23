@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  cognify:
+    build: .
+    container_name: cognify
+    ports:
+      - "8501:8501"
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://ollama.com/v1}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-mistral-large-3:675b}
+      - COGNIFY_USER=${COGNIFY_USER:-admin}
+      - COGNIFY_PASS=${COGNIFY_PASS:-cognify123}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+    volumes:
+      - cognify_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  cognify_data:
