@@ -13,6 +13,7 @@ st.set_page_config(
 )
 
 from src.ui import check_auth, inject_css, render_header, render_sidebar_footer, pipeline_html, parse_sources
+from src.export import export_markdown, export_single_answer
 
 if not check_auth():
     st.stop()
@@ -80,9 +81,21 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("🗑️ Clear Chat", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🗑️ Clear", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+    with col2:
+        if st.session_state.get("messages"):
+            md_export = export_markdown(st.session_state.messages)
+            st.download_button(
+                "📥 Export",
+                data=md_export,
+                file_name="cognify_chat.md",
+                mime="text/markdown",
+                use_container_width=True,
+            )
 
     render_sidebar_footer()
 
@@ -252,6 +265,17 @@ if prompt := st.chat_input("Ask anything about your documents..."):
     <span class="source-page"> • p.{src['page']}</span>
     <div class="source-text">{src['text'][:300]}{'...' if len(src['text']) > 300 else ''}</div>
 </div>""", unsafe_allow_html=True)
+
+            # Export button for this answer
+            q_num = len([m for m in st.session_state.messages if m["role"] == "user"])
+            single_md = export_single_answer(prompt, answer, sources, trace)
+            st.download_button(
+                "📥 Export Answer",
+                data=single_md,
+                file_name=f"cognify_answer_{q_num}.md",
+                mime="text/markdown",
+                key=f"export_{q_num}_{time.time()}",
+            )
 
             st.session_state.messages.append({
                 "role": "assistant",
