@@ -15,7 +15,7 @@ if not check_auth():
 inject_css()
 render_header()
 
-from src.ingest import ingest_file, get_vectorstore
+from src.ingest import ingest_file, ingest_url, get_vectorstore
 
 # --- Page Header ---
 st.markdown('<div class="page-title">📁 Document Manager</div>', unsafe_allow_html=True)
@@ -54,6 +54,23 @@ with col2:
             st.balloons()
             st.info(f"📊 **{total_chunks}** chunks indexed")
             st.rerun()
+
+st.divider()
+
+# --- URL Ingestion ---
+st.markdown("### 🌐 Ingest from URL")
+url_col1, url_col2 = st.columns([4, 1])
+with url_col1:
+    url_input = st.text_input("Paste URL", placeholder="https://example.com/article", label_visibility="collapsed")
+with url_col2:
+    if url_input and st.button("🌐 Ingest", type="primary", use_container_width=True):
+        with st.spinner(f"Scraping {url_input}..."):
+            try:
+                chunks = ingest_url(url_input)
+                st.success(f"✅ {url_input} — {chunks} chunks")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
 
 st.divider()
 

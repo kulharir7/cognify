@@ -21,7 +21,7 @@ if not check_auth():
 inject_css()
 render_header()
 
-from src.ingest import ingest_file, get_vectorstore
+from src.ingest import ingest_file, ingest_url, get_vectorstore
 from src.agents import run_query_steps
 
 # --- Sidebar ---
