@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+data/chroma_db/
+data/uploads/
+.streamlit/secrets.toml
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
