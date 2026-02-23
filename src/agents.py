@@ -10,6 +10,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage, SystemMessage
 from src.llm import get_llm, get_streaming_llm
 from src.ingest import get_vectorstore
+from src.retriever import hybrid_search
 from src.config import Config
 
 
@@ -125,17 +126,18 @@ def researcher(state: AgentState) -> AgentState:
     Uses context_query (rewritten with conversation context) for retrieval.
     """
     start = time.time()
-    vectorstore = get_vectorstore()
     
     # Use rewritten query for better retrieval
     search_query = state.get("context_query", state["query"])
-    results = vectorstore.similarity_search(search_query, k=Config.TOP_K)
+    
+    # Hybrid search: BM25 + Vector + RRF fusion
+    results = hybrid_search(search_query, top_k=Config.TOP_K)
 
     retrieved = []
     for i, doc in enumerate(results):
-        source = doc.metadata.get("source", "unknown")
-        page = doc.metadata.get("page", "?")
-        retrieved.append(f"[Source {i+1}: {source}, p.{page}]\n{doc.page_content}")
+        source = doc["metadata"].get("source", "unknown")
+        page = doc["metadata"].get("page", "?")
+        retrieved.append(f"[Source {i+1}: {source}, p.{page}]\n{doc['content']}")
 
     state["retrieved_docs"] = retrieved
 
