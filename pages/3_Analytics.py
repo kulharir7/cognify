@@ -30,6 +30,15 @@ except Exception:
     chunk_count = 0
 
 # --- Top Stats ---
+times = []
+for m in asst_msgs:
+    if m.get("total_time"):
+        try:
+            times.append(float(m["total_time"].rstrip("s")))
+        except (ValueError, AttributeError):
+            pass
+avg_time = f"{sum(times)/len(times):.1f}s" if times else "—"
+
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.markdown(f'<div class="stat-card"><div class="stat-value">{len(user_msgs)}</div><div class="stat-label">Questions Asked</div></div>', unsafe_allow_html=True)
@@ -38,15 +47,6 @@ with c2:
 with c3:
     st.markdown(f'<div class="stat-card"><div class="stat-value">{chunk_count}</div><div class="stat-label">Indexed Chunks</div></div>', unsafe_allow_html=True)
 with c4:
-    # Average response time
-    times = []
-    for m in asst_msgs:
-        if m.get("total_time"):
-            try:
-                times.append(float(m["total_time"].rstrip("s")))
-            except (ValueError, AttributeError):
-                pass
-    avg_time = f"{sum(times)/len(times):.1f}s" if times else "—"
     st.markdown(f'<div class="stat-card"><div class="stat-value">{avg_time}</div><div class="stat-label">Avg Response Time</div></div>', unsafe_allow_html=True)
 
 st.divider()
@@ -55,7 +55,6 @@ st.divider()
 st.markdown("### ⏱️ Agent Performance")
 
 if asst_msgs:
-    # Collect agent timings from traces
     agent_times = {"🔄 Context Rewriter": [], "🔍 Researcher": [], "📝 Synthesizer": [], "✅ Fact-Checker": []}
     
     for m in asst_msgs:
@@ -79,7 +78,6 @@ if asst_msgs:
 
     st.divider()
 
-    # --- Response Time History ---
     st.markdown("### 📈 Response Time History")
     if times:
         import pandas as pd
@@ -89,15 +87,13 @@ if asst_msgs:
         })
         st.line_chart(df.set_index("Query #"), color="#667eea")
     else:
-        st.info("No timing data yet. Ask some questions first!")
+        st.info("No timing data yet.")
 
     st.divider()
 
-    # --- Recent Questions ---
     st.markdown("### 💬 Recent Questions")
     for i, m in enumerate(reversed(user_msgs[-10:])):
         st.markdown(f"**Q{len(user_msgs) - i}:** {m['content']}")
-
 else:
     st.info("No analytics data yet. Start asking questions on the Chat page!")
 

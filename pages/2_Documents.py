@@ -91,9 +91,9 @@ with c1:
 
 # Get unique sources
 source_names = set()
+results = {"metadatas": [], "ids": []}
 if collection and total_chunks > 0:
     try:
-        # Get all metadata
         results = collection.get(limit=total_chunks, include=["metadatas"])
         for meta in results.get("metadatas", []):
             if meta and "source" in meta:
@@ -114,9 +114,7 @@ st.divider()
 st.markdown("### 📄 Indexed Documents")
 
 if source_names:
-    # Build document info table
     for doc_name in sorted(source_names):
-        # Count chunks for this document
         doc_chunks = sum(
             1 for meta in results.get("metadatas", [])
             if meta and os.path.basename(meta.get("source", "")) == doc_name
@@ -128,10 +126,8 @@ if source_names:
         with col2:
             st.caption(f"{doc_chunks} chunks")
         with col3:
-            # Delete button for this document
             if st.button("🗑️", key=f"del_{doc_name}", help=f"Delete {doc_name}"):
                 try:
-                    # Get IDs for this document
                     ids_to_delete = [
                         results["ids"][i]
                         for i, meta in enumerate(results.get("metadatas", []))
@@ -150,12 +146,10 @@ st.divider()
 
 # --- Danger Zone ---
 st.markdown("### ⚠️ Danger Zone")
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("🗑️ Clear Entire Knowledge Base", type="secondary", use_container_width=True):
-        shutil.rmtree("./data/chroma_db", ignore_errors=True)
-        st.success("Knowledge base cleared!")
-        st.rerun()
+if st.button("🗑️ Clear Entire Knowledge Base", type="secondary", use_container_width=True):
+    shutil.rmtree("./data/chroma_db", ignore_errors=True)
+    st.success("Knowledge base cleared!")
+    st.rerun()
 
 # --- Sidebar ---
 with st.sidebar:

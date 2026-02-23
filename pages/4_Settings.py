@@ -57,7 +57,7 @@ with col1:
         model = st.selectbox("Main Model", defaults["models"], index=0)
 
 with col2:
-    api_key = st.text_input("API Key", type="password", value=os.getenv("LLM_API_KEY", ""), placeholder="Enter API key")
+    api_key = st.text_input("API Key", type="password", value=os.getenv("LLM_API_KEY", ""), placeholder="Enter your API key")
     if provider != "Custom (OpenAI-compatible)":
         fast_model_options = defaults["models"]
         fast_idx = min(1, len(fast_model_options) - 1) if len(fast_model_options) > 1 else 0
@@ -65,8 +65,7 @@ with col2:
     else:
         fast_model = st.text_input("Fast Model", value="", placeholder="fast-model-name")
 
-# Apply settings
-if st.button("💾 Save Settings", type="primary"):
+if st.button("💾 Save Settings", type="primary", use_container_width=True):
     if api_key:
         os.environ["LLM_API_KEY"] = api_key
     if base_url:
@@ -90,7 +89,7 @@ with col2:
 with col3:
     top_k = st.number_input("Top K Results", value=int(os.getenv("TOP_K", "5")), min_value=1, max_value=20, step=1)
 
-if st.button("💾 Save RAG Settings"):
+if st.button("💾 Save RAG Settings", use_container_width=True):
     os.environ["CHUNK_SIZE"] = str(chunk_size)
     os.environ["CHUNK_OVERLAP"] = str(chunk_overlap)
     os.environ["TOP_K"] = str(top_k)
@@ -106,7 +105,7 @@ config_data = {
     "Base URL": os.getenv("LLM_BASE_URL", "https://ollama.com/v1"),
     "Model": os.getenv("LLM_MODEL", "mistral-large-3:675b"),
     "Fast Model": os.getenv("LLM_FAST_MODEL", "same as main"),
-    "API Key": "●●●●●●●●" if os.getenv("LLM_API_KEY") else "Not set",
+    "API Key": "●●●●●●●●" if os.getenv("LLM_API_KEY") else "⚠️ Not set",
     "Chunk Size": os.getenv("CHUNK_SIZE", "1000"),
     "Chunk Overlap": os.getenv("CHUNK_OVERLAP", "200"),
     "Top K": os.getenv("TOP_K", "5"),
