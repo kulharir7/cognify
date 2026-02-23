@@ -120,21 +120,61 @@ Rewritten Question:"""
     return state
 
 
-def researcher(state: AgentState) -> AgentState:
-    """Retrieve relevant chunks and extract key information.
+def _generate_sub_queries(query: str, llm) -> list[str]:
+    """Generate 2-3 alternative queries for multi-query expansion.
     
-    Uses context_query (rewritten with conversation context) for retrieval.
+    "What is DynamoDB?" → ["DynamoDB features and capabilities", "DynamoDB use cases", "AWS DynamoDB overview"]
+    """
+    prompt = f"""Generate 2-3 alternative search queries for the following question.
+Each query should approach the topic from a different angle to find more relevant information.
+Output ONLY the queries, one per line. No numbering, no explanations.
+
+Original question: {query}"""
+
+    response = llm.invoke([
+        SystemMessage(content="You generate alternative search queries. Output only queries, one per line."),
+        HumanMessage(content=prompt)
+    ])
+    
+    sub_queries = [q.strip() for q in response.content.strip().split("\n") if q.strip()]
+    # Safety: limit to 3 sub-queries
+    return sub_queries[:3]
+
+
+def researcher(state: AgentState) -> AgentState:
+    """Retrieve relevant chunks using multi-query expansion + hybrid search.
+    
+    1. Generates alternative queries for better coverage
+    2. Runs hybrid search (BM25 + Vector + RRF) on each query
+    3. Deduplicates and merges results
     """
     start = time.time()
     
-    # Use rewritten query for better retrieval
     search_query = state.get("context_query", state["query"])
     
-    # Hybrid search: BM25 + Vector + RRF fusion
-    results = hybrid_search(search_query, top_k=Config.TOP_K)
+    # Multi-query expansion
+    llm = get_llm(fast=True)
+    sub_queries = _generate_sub_queries(search_query, llm)
+    all_queries = [search_query] + sub_queries
+    
+    # Run hybrid search on all queries and merge
+    seen_texts = set()
+    all_results = []
+    
+    for q in all_queries:
+        results = hybrid_search(q, top_k=Config.TOP_K)
+        for r in results:
+            # Deduplicate by content
+            content_hash = r["content"][:200]
+            if content_hash not in seen_texts:
+                seen_texts.add(content_hash)
+                all_results.append(r)
+    
+    # Keep top_k best results
+    all_results = all_results[:Config.TOP_K]
 
     retrieved = []
-    for i, doc in enumerate(results):
+    for i, doc in enumerate(all_results):
         source = doc["metadata"].get("source", "unknown")
         page = doc["metadata"].get("page", "?")
         retrieved.append(f"[Source {i+1}: {source}, p.{page}]\n{doc['content']}")
@@ -172,7 +212,7 @@ Be thorough but concise. Use bullet points."""
     state["research_output"] = response.content
     state["agent_trace"].append({
         "agent": "🔍 Researcher",
-        "action": f"Retrieved {len(retrieved)} chunks using query: \"{search_query[:80]}\"",
+        "action": f"Multi-query: {len(all_queries)} queries → {len(retrieved)} unique chunks (hybrid BM25+vector)",
         "output_preview": response.content[:300] + "..." if len(response.content) > 300 else response.content,
         "time": f"{elapsed:.1f}s",
     })
